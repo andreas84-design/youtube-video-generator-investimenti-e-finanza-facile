@@ -77,95 +77,115 @@ def cleanup_old_videos(s3_client, current_key):
 
 
 # -------------------------------------------------
-# Mapping SCENA → QUERY visiva (canale Archivio 84 - True Crime)
+# Mapping SCENA → QUERY visiva (canale Investimenti e Finanza Facile)
 # -------------------------------------------------
 def pick_visual_query(context: str, keywords_text: str = "") -> str:
     """
-    Query ottimizzate per B‑roll True Crime:
-    scene investigative, tribunali, città notturne, prove forensi, archivi.
+    Query ottimizzate per B‑roll Finanza Personale:
+    grafici, città finanziarie, calcoli, risparmi, famiglia serena, pianificazione.
     """
     ctx = (context or "").lower()
     kw = (keywords_text or "").lower()
 
-    base = "dark city night, police investigation, crime scene, courthouse, detective work"
+    base = "financial charts data analysis, business growth graphs, investment planning, money savings"
 
-    # Omicidio / delitto / assassinio
-    if any(w in ctx for w in ["omicid", "uccis", "assassin", "vittima", "corpo", "sangue"]):
-        return "crime scene tape police line, dark alley night, detective flashlight, forensic investigation"
+    # ETF / Investimenti / Azioni / Obbligazioni
+    if any(w in ctx for w in ["etf", "investiment", "azion", "obbligaz", "portafogli", "diversific"]):
+        return "stock market charts rising, financial graphs business analysis, investment portfolio laptop screen"
 
-    # Cold case / caso irrisolto / mistero
-    if any(w in ctx for w in ["irrisolt", "freddo", "mistero", "scompar", "sparit", "mai risolt"]):
-        return "old case files dusty archive, vintage newspaper clippings, cold case board with photos and strings"
+    # Risparmio / Budget / Soldi
+    if any(w in ctx for w in ["risparmio", "budget", "soldi", "denaro", "euro", "risorse", "finanze"]):
+        return "person saving money piggy bank, budget planning calculator notebook, coins euro bills counting"
 
-    # Indagine / investigazione / polizia
-    if any(w in ctx for w in ["indag", "investig", "polizi", "carabinieri", "detective", "ispettor"]):
-        return "police detective examining evidence, interrogation room dim light, officers investigating crime scene"
+    # Pensione / Previdenza / Futuro / TFR
+    if any(w in ctx for w in ["pension", "previdenz", "futuro", "tfr", "vecchiaia", "anzian"]):
+        return "elderly couple planning retirement happy, pension savings calculator, senior people relaxed financial freedom"
 
-    # Tribunale / processo / giudice / condanna
-    if any(w in ctx for w in ["tribunal", "process", "giudic", "condanna", "sentenza", "corte", "avvocat"]):
-        return "courthouse exterior justice columns, courtroom empty dramatic lighting, judge gavel on desk"
+    # Broker / Piattaforma / App / Trading
+    if any(w in ctx for w in ["broker", "piattaforma", "app", "trading", "compravendita", "acquist"]):
+        return "person using financial app smartphone, stock trading platform laptop, online banking mobile interface"
 
-    # Prove / forensi / DNA / analisi
-    if any(w in ctx for w in ["prov", "forens", "dna", "analisi", "laboratorio", "scienza"]):
-        return "forensic lab scientist microscope, evidence bags numbered markers, DNA test tubes laboratory"
+    # Fiscalità / Tasse / Dichiarazione / Detrazioni
+    if any(w in ctx for w in ["fiscalit", "tasse", "dichiaraz", "detrazion", "fiscal", "tribut"]):
+        return "tax forms documents calculator, person filling tax declaration paper, accountant reviewing financial documents"
 
-    # Testimone / racconto / dichiarazione
-    if any(w in ctx for w in ["testimon", "raccont", "dichiaraz", "confess", "version"]):
-        return "person silhouette interrogation light, witness protection anonymous figure, confession room recording"
+    # Conto deposito / Banca / Interessi
+    if any(w in ctx for w in ["conto", "banca", "deposit", "interest", "rendiment", "guadagn"]):
+        return "bank building modern architecture, savings account interest growth chart, person checking bank statement laptop"
 
-    # Città / luogo / scena del crimine
-    if any(w in ctx for w in ["città", "strada", "quartiere", "zona", "luogo", "posto", "scena"]):
-        return "dark urban street night rain, abandoned building crime scene, city alley police tape flickering lights"
+    # Carte credito / Cashback / Pagamenti
+    if any(w in ctx for w in ["carta", "cashback", "pagament", "credit", "bancomat", "pos"]):
+        return "credit card payment contactless, cashback rewards shopping, person using card terminal store"
 
-    # Archivio / documenti / foto / dossier
-    if any(w in ctx for w in ["archivio", "document", "foto", "dossier", "fascicol", "registr"]):
-        return "old archive filing cabinets dim light, vintage crime photos spread on table, detective reviewing case files"
+    # Robo-advisor / Automatico / Tecnologia
+    if any(w in ctx for w in ["robo", "automat", "tecnolog", "digital", "AI", "algoritm"]):
+        return "AI technology financial automation, digital investment platform interface, automated trading algorithms visualization"
 
-    # Anno / epoca / passato / storia
-    if any(w in ctx for w in ["anno", "epoca", "anni", "decenni", "storia", "passato", "tempo"]):
-        return "vintage newspaper headlines, old black white crime photos, retro police car 1980s street"
+    # Famiglia / Casa / Vita quotidiana
+    if any(w in ctx for w in ["famigli", "casa", "figli", "coppia", "genitori", "quotidian"]):
+        return "happy family home financial planning, couple reviewing budget documents together, parents saving for children future"
 
-    # Famiglia / vittima / dolore / giustizia
-    if any(w in ctx for w in ["famiglia", "madre", "padre", "parent", "dolore", "giustizia", "verità"]):
-        return "memorial candles night vigil, family photo frame grief, justice scales courthouse dramatic"
+    # Crescita / Rendimento / Performance / Guadagno
+    if any(w in ctx for w in ["crescita", "rendiment", "performance", "guadagn", "profit", "ritorni"]):
+        return "rising financial graph success, business growth chart upward trend, profit increase stock market screen"
+
+    # Errori / Rischi / Perdite / Attenzione
+    if any(w in ctx for w in ["error", "rischi", "perdita", "attenzione", "pericol", "evitar"]):
+        return "warning sign financial risk, stock market crash red charts, person worried looking at declining graph"
+
+    # Strategia / Piano / Obiettivi
+    if any(w in ctx for w in ["strategi", "piano", "obiettiv", "meta", "pianific", "progett"]):
+        return "business strategy planning board, financial goals checklist, person writing investment plan notebook"
+
+    # Giovani / Millennials / Principianti / Iniziare
+    if any(w in ctx for w in ["giovan", "millennial", "principiant", "iniziar", "cominciar", "primo"]):
+        return "young person learning investment smartphone, millennial planning finances laptop cafe, beginner reading financial book"
+
+    # Libertà finanziaria / Indipendenza / Passive income
+    if any(w in ctx for w in ["libertà", "indipendenz", "passive", "rendita", "autonomi"]):
+        return "person relaxing financial freedom beach, passive income laptop remote work, independent financially free lifestyle"
+
+    # Inflazione / Economia / Mercato
+    if any(w in ctx for w in ["inflazion", "economi", "mercato", "crisi", "prezzi"]):
+        return "inflation economic charts rising prices, market economy news financial data, cost of living increase graph"
+
+    # Educazione / Imparare / Conoscenza
+    if any(w in ctx for w in ["educazion", "impara", "conoscenz", "studia", "formazio"]):
+        return "person studying financial education books, learning investment online course, financial literacy training"
 
     # Se abbiamo keywords specifiche dallo Sheet
     if kw and kw != "none":
-        return f"{kw}, crime investigation, dark atmosphere, forensic evidence, dramatic lighting"
+        return f"{kw}, financial planning, investment charts, business growth, money management"
 
-    # Fallback True Crime generico
+    # Fallback Finanza generico
     return base
 
 
 def fetch_clip_for_scene(scene_number: int, query: str, avg_scene_duration: float):
     """
-    🎯 Canale True Crime: B‑roll investigativo e drammatico.
-    Priorità: scene notturne, investigazioni, tribunali, atmosfera noir.
-    Filtro anti‑content inappropriato (animali, sport, cucina, fitness).
+    🎯 Canale Finanza: B‑roll professionale, pulito, positivo.
+    Priorità: grafici, persone che pianificano, città business, calcoli.
+    Filtro anti‑content inappropriato (animali, sport, cucina, fitness, party).
     """
     target_duration = min(4.0, avg_scene_duration)
 
-    def is_crime_video_metadata(video_data, source):
+    def is_finance_video_metadata(video_data, source):
         banned = [
-            "dog",
-            "cat",
-            "animal",
-            "wildlife",
-            "bird",
-            "fish",
-            "horse",
-            "fitness",
-            "yoga",
-            "workout",
-            "kitchen",
-            "cooking",
-            "food",
-            "wedding",
-            "party",
-            "celebration",
-            "sports",
-            "game",
+            "dog", "cat", "animal", "wildlife", "bird", "fish", "horse",
+            "fitness", "yoga", "workout", "gym", "exercise",
+            "kitchen", "cooking", "food", "recipe", "chef",
+            "wedding", "party", "celebration", "festival",
+            "sports", "game", "soccer", "football", "basketball",
+            "gaming", "videogame", "esports"
         ]
+        
+        # Keywords finanza che vogliamo
+        finance_keywords = [
+            "business", "finance", "money", "investment", "stock", "chart",
+            "graph", "data", "analysis", "banking", "savings", "planning",
+            "budget", "calculator", "laptop", "office", "city", "growth"
+        ]
+        
         if source == "pexels":
             text = (video_data.get("description", "") + " " +
                     " ".join(video_data.get("tags", []))).lower()
@@ -173,8 +193,12 @@ def fetch_clip_for_scene(scene_number: int, query: str, avg_scene_duration: floa
             text = " ".join(video_data.get("tags", [])).lower()
 
         has_banned = any(kw in text for kw in banned)
-        status = "OK" if not has_banned else "OFF‑TOPIC"
+        has_finance = any(kw in text for kw in finance_keywords)
+        
+        status = "✅ FINANCE OK" if (not has_banned and has_finance) else ("❌ OFF‑TOPIC" if has_banned else "⚠️ NEUTRAL")
         print(f"🔍 [{source}] '{text[:60]}...' → {status}", flush=True)
+        
+        # Accetta se: (1) ha keywords finanza E non banned, OPPURE (2) non ha banned (neutrale OK)
         return not has_banned
 
     def download_file(url: str) -> str:
@@ -187,13 +211,13 @@ def fetch_clip_for_scene(scene_number: int, query: str, avg_scene_duration: floa
         tmp_clip.close()
         return tmp_clip.name
 
-    # --- PEXELS: query true crime ---
+    # --- PEXELS: query finanza ---
     def try_pexels():
         if not PEXELS_API_KEY:
             return None
         headers = {"Authorization": PEXELS_API_KEY}
         params = {
-            "query": f"{query} dark night city investigation crime police",
+            "query": f"{query} business finance charts investment planning",
             "orientation": "landscape",
             "per_page": 25,
             "page": random.randint(1, 3),
@@ -208,23 +232,23 @@ def fetch_clip_for_scene(scene_number: int, query: str, avg_scene_duration: floa
             return None
 
         videos = resp.json().get("videos", [])
-        crime_videos = [v for v in videos if is_crime_video_metadata(v, "pexels")]
+        finance_videos = [v for v in videos if is_finance_video_metadata(v, "pexels")]
 
-        print(f"🎯 Pexels: {len(videos)} totali → {len(crime_videos)} CRIME OK", flush=True)
-        if crime_videos:
-            video = random.choice(crime_videos)
+        print(f"🎯 Pexels: {len(videos)} totali → {len(finance_videos)} FINANCE OK", flush=True)
+        if finance_videos:
+            video = random.choice(finance_videos)
             for vf in video.get("video_files", []):
                 if vf.get("width", 0) >= 1280:
                     return download_file(vf["link"])
         return None
 
-    # --- PIXABAY: query true crime ---
+    # --- PIXABAY: query finanza ---
     def try_pixabay():
         if not PIXABAY_API_KEY:
             return None
         params = {
             "key": PIXABAY_API_KEY,
-            "q": f"{query} dark night city investigation crime police",
+            "q": f"{query} business finance charts investment planning",
             "per_page": 25,
             "safesearch": "true",
             "min_width": 1280,
@@ -235,7 +259,7 @@ def fetch_clip_for_scene(scene_number: int, query: str, avg_scene_duration: floa
 
         hits = resp.json().get("hits", [])
         for hit in hits:
-            if is_crime_video_metadata(hit, "pixabay"):
+            if is_finance_video_metadata(hit, "pixabay"):
                 videos = hit.get("videos", {})
                 for quality in ["large", "medium", "small"]:
                     if quality in videos and "url" in videos[quality]:
@@ -316,7 +340,7 @@ def generate():
 
         print("=" * 80, flush=True)
         print(
-            f"🎬 START: {len(script)} char script, keywords: '{sheet_keywords}'",
+            f"🎬 START FINANZA: {len(script)} char script, keywords: '{sheet_keywords}'",
             flush=True,
         )
 
@@ -395,7 +419,7 @@ def generate():
             scene_context = (
                 " ".join(script_words[word_index: word_index + 7])
                 if word_index < len(script_words)
-                else "dark city night police investigation crime"
+                else "financial charts investment planning business growth"
             )
             scene_query = pick_visual_query(scene_context, sheet_keywords)
             scene_assignments.append(
@@ -612,7 +636,7 @@ def generate():
                 pass
 
         print(
-            f"✅ VIDEO COMPLETO: {real_duration/60:.1f}min → {public_url}",
+            f"✅ VIDEO FINANZA COMPLETO: {real_duration/60:.1f}min → {public_url}",
             flush=True,
         )
 
