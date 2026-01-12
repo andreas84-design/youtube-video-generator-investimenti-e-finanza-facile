@@ -19,11 +19,15 @@ from google.oauth2.service_account import Credentials
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
 logger = logging.getLogger(__name__)
 
+# 🔧 FIX 1: Railway Variables
+MAX_DURATION = int(os.getenv('MAX_DURATION', '3600'))
+MAX_CONCURRENT = int(os.getenv('MAX_CONCURRENT', '5'))
+MAX_CLIPS = int(os.getenv('MAX_CLIPS', '40'))
+LOG_RATE = int(os.getenv('LOG_RATE', '100'))
+
 app = Flask(__name__)
 
-# =======================
-# CONFIG INVESTFINANZA
-# =======================
+# Config R2 (S3 compatibile)
 R2_ACCESS_KEY_ID = os.environ.get("R2_ACCESS_KEY_ID")
 R2_SECRET_ACCESS_KEY = os.environ.get("R2_SECRET_ACCESS_KEY")
 R2_BUCKET_NAME = os.environ.get("R2_BUCKET_NAME")
@@ -31,19 +35,22 @@ R2_PUBLIC_BASE_URL = os.environ.get("R2_PUBLIC_BASE_URL")
 R2_REGION = os.environ.get("R2_REGION", "auto")
 R2_ACCOUNT_ID = os.environ.get("R2_ACCOUNT_ID")
 
+# Pexels / Pixabay API
 PEXELS_API_KEY = os.environ.get("PEXELS_API_KEY")
 PIXABAY_API_KEY = os.environ.get("PIXABAY_API_KEY")
-
 GOOGLE_CREDENTIALS_JSON = os.environ.get("GOOGLE_CREDENTIALS_JSON", "")
-SPREADSHEET_ID = "1crtkMzTXprYElfDTZ_HhnAlNfuMOJ0bwLSSiyM_JQgc"  # NUOVO INVESTFINANZA
+
+# ✅ ID FISSO INVESTIMENTI E FINANZA FACILE
+SPREADSHEET_ID = "1crtkMzTXprYElfDTZ_HhnAlNfuMOJ0bwLSSiyM_JQgc"
+
+# 🔔 Webhook flusso 2 (Investimenti e Finanza Facile)
+N8N_WEBHOOK_URL_FLUSSO2 = os.environ.get("N8N_WEBHOOK_URL_INVESTIMENTI_FINANZA_FACILE_FLUSSO2")
 
 jobs = {}
 MAX_JOBS = 50
 
-# =======================
-# GOOGLE SHEETS
-# =======================
 def get_gspread_client():
+    """Client Google Sheets per update Video_URL"""
     try:
         if not GOOGLE_CREDENTIALS_JSON:
             return None
@@ -55,10 +62,8 @@ def get_gspread_client():
         logger.error(f"Google Sheets client error: {e}")
         return None
 
-# =======================
-# R2 CLOUDFLARE
-# =======================
 def get_s3_client():
+    """Client S3 configurato per Cloudflare R2"""
     if R2_ACCOUNT_ID:
         endpoint_url = f"https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
     else:
@@ -99,11 +104,36 @@ def cleanup_old_videos(s3_client, current_key):
     except Exception as e:
         print(f"⚠️ Errore rotazione R2 (video vecchi restano): {str(e)}", flush=True)
 
-# =======================
-# VISUAL QUERY (FINANZA)
-# =======================
+def notify_n8n_flusso2(job):
+    """Invia webhook a n8n quando il job è completato."""
+    if not N8N_WEBHOOK_URL_FLUSSO2:
+        print("⚠️ N8N_WEBHOOK_URL_INVESTIMENTI_FINANZA_FACILE_FLUSSO2 non configurata, skip webhook", flush=True)
+        return
+
+    try:
+        payload = {
+            "job_id": job.get("job_id"),
+            "video_url": job.get("video_url"),
+            "duration": job.get("duration"),
+            "clips_used": job.get("clips_used"),
+            # dati che arrivano dal flusso 1 nel /generate
+            "title": job.get("data", {}).get("title"),
+            "description_pro": job.get("data", {}).get("description_pro"),
+            "row_id": job.get("row_number") or job.get("data", {}).get("row_id"),
+            "keywords": job.get("data", {}).get("keywords"),
+            "playlist": job.get("data", {}).get("playlist"),
+            "channel": "investimenti_finanza_facile",
+        }
+        resp = requests.post(N8N_WEBHOOK_URL_FLUSSO2, json=payload, timeout=15)
+        print(f"🔔 Webhook n8n flusso2 status={resp.status_code}", flush=True)
+    except Exception as e:
+        print(f"⚠️ Errore invio webhook n8n flusso2: {e}", flush=True)
+
+# -------------------------------------------------
+# Mapping SCENA → QUERY visiva (INVESTIMENTI E FINANZA FACILE)
+# -------------------------------------------------
 def pick_visual_query(context: str, keywords_text: str = "") -> str:
-    """Query B-roll INVESTFINANZA: grafici, trading, soldi, business, analisi."""
+    """Query B-roll FINANZA: grafici, trading, soldi, business, analisi."""
     ctx = (context or "").lower()
     kw = (keywords_text or "").lower()
     
@@ -133,18 +163,15 @@ def pick_visual_query(context: str, keywords_text: str = "") -> str:
     if any(w in ctx for w in ["banca", "immobiliare", "mutuo", "credito", "prestit"]):
         return "bank real estate property mortgage loan finance documents contract"
     
-    # Keywords da Sheet (finanza-oriented)
+    # Keywords da Sheet
     if kw and kw != "none":
         return f"{kw}, finance stock market trading graph money investment business chart"
     
-    # Fallback Finanza generico
+    # Fallback
     return base
 
-# =======================
-# FILTRO VIDEO (FINANZA)
-# =======================
 def is_finance_video_metadata(video_data, source):
-    """Filtro PERMISSIVO Finanza: accetta tutto tranne banned non-finanziari."""
+    """Filtro PERMISSIVO Finanza: accetta tutto tranne banned."""
     finance_keywords = ["finance", "stock", "market", "trading", "money", "investment", "business", 
                        "chart", "graph", "office", "corporate", "bank", "wealth", "economy"]
     
@@ -167,8 +194,6 @@ def is_finance_video_metadata(video_data, source):
         status = f"⚠️ NEUTRAL(finance:{finance_count})"
     
     print(f"🔍 [{source}] '{text[:60]}...' → {status}", flush=True)
-    
-    # PERMISSIVO: accetta TUTTO tranne banned
     return not has_banned
 
 # =======================
@@ -186,7 +211,7 @@ def download_file(url: str) -> str:
     return tmp_clip.name
 
 def fetch_clip_for_scene(scene_number: int, query: str, avg_scene_duration: float):
-    """Fetch B-roll INVESTFINANZA da Pexels → Pixabay fallback."""
+    """🎯 INVESTFINANZA: B-roll finanza. Fallback Pixabay se Pexels 0."""
     target_duration = min(4.0, avg_scene_duration)
     
     def try_pexels():
@@ -247,12 +272,9 @@ def fetch_clip_for_scene(scene_number: int, query: str, avg_scene_duration: floa
     print(f"⚠️ NO CLIP per scena {scene_number}: '{query}'", flush=True)
     return None, None
 
-# =======================
-# HEALTH ENDPOINTS
-# =======================
 @app.route("/health", methods=["GET"])
 def health():
-    return jsonify({"status": "healthy_investfinanza", "jobs": len(jobs)})
+    return jsonify({"status": "healthy", "jobs": len(jobs)})
 
 @app.route("/ffmpeg-test", methods=["GET"])
 def ffmpeg_test():
@@ -284,9 +306,12 @@ def get_status(job_id):
 # PROCESS VIDEO ASYNC
 # =======================
 def process_video_async(job_id, data):
-    """Processa video INVESTFINANZA in background thread"""
+    """Processa video INVESTIMENTI FINANZA in background thread"""
     job = jobs[job_id]
     job["status"] = "processing"
+    # memorizza info per il webhook n8n flusso 2
+    job["job_id"] = job_id
+    job["data"] = data
     
     audiopath = None
     audio_wav_path = None
@@ -304,7 +329,7 @@ def process_video_async(job_id, data):
         raw_keywords = data.get("keywords", "")
         sheet_keywords = (", ".join(str(k).strip() for k in raw_keywords) if isinstance(raw_keywords, list) else str(raw_keywords).strip())
         
-        # FIX: Parsing row_number ROBUSTO (gestisce dict/str/int da n8n)
+        # 🔧 Parsing row_number ULTRA-ROBUSTO
         row_number_raw = data.get("row_number")
         if isinstance(row_number_raw, dict):
             row_number = int(row_number_raw.get('row', row_number_raw.get('row_number', 1)))
@@ -316,9 +341,9 @@ def process_video_async(job_id, data):
             row_number = 1
 
         print("=" * 80, flush=True)
-        print(f"💰 START INVESTFINANZA: {len(script)} char script, keywords: '{sheet_keywords}', row: {row_number}", flush=True)
+        print(f"🎬 START INVESTIMENTI FINANZA: {len(script)} char script, keywords: '{sheet_keywords}', row: {row_number}", flush=True)
         print(f"🔍 DEBUG row_number RAW: '{row_number_raw}' → PARSED: '{row_number}'", flush=True)
-        print(f"🔍 DEBUG GOOGLE_CREDENTIALS_JSON: {'PRESENTE (' + str(len(GOOGLE_CREDENTIALS_JSON)) + ' char)' if GOOGLE_CREDENTIALS_JSON else 'MANCANTE'}", flush=True)
+        print(f"🔍 DEBUG GOOGLE_CREDENTIALS_JSON: {'PRESENTE ({len(GOOGLE_CREDENTIALS_JSON)} char)' if GOOGLE_CREDENTIALS_JSON else 'MANCANTE'}", flush=True)
         
         if not audiobase64:
             raise RuntimeError("audiobase64 mancante")
@@ -336,11 +361,10 @@ def process_video_async(job_id, data):
         subprocess.run([
             "ffmpeg", "-y", "-loglevel", "error", "-i", audiopath_tmp,
             "-acodec", "pcm_s16le", "-ar", "48000", audio_wav_path
-        ], timeout=60, check=True)
+        ], timeout=MAX_DURATION, check=True)
         os.unlink(audiopath_tmp)
         audiopath = audio_wav_path
         
-        # Real duration
         probe = subprocess.run([
             "ffprobe", "-v", "error", "-show_entries", "format=duration",
             "-of", "default=noprint_wrappers=1:nokey=1", audiopath
@@ -348,13 +372,15 @@ def process_video_async(job_id, data):
         real_duration = float(probe.stdout.strip() or 720.0)
         print(f"⏱️ Durata audio: {real_duration/60:.1f}min ({real_duration:.0f}s)", flush=True)
         
-        # Scene sync
         script_words = script.lower().split()
         words_per_second = (len(script_words) / real_duration if real_duration > 0 else 2.5)
-        avg_scene_duration = real_duration / 25
+        num_scenes = MAX_CLIPS
+        avg_scene_duration = real_duration / num_scenes
         scene_assignments = []
         
-        for i in range(25):
+        for i in range(num_scenes):
+            if i % 10 == 0:
+                print(f"🔧 Clip {i}/{num_scenes}", flush=True)
             timestamp = i * avg_scene_duration
             word_index = int(timestamp * words_per_second)
             scene_context = " ".join(script_words[word_index: word_index + 7]) if word_index < len(script_words) else "finance investment trading money"
@@ -364,20 +390,17 @@ def process_video_async(job_id, data):
                 "context": scene_context[:60], "query": scene_query[:80]
             })
         
-        # Download clips
         for assignment in scene_assignments:
-            print(f"📍 Scene {assignment['scene']}: {assignment['timestamp']}s → '{assignment['context']}'", flush=True)
             clip_path, clip_dur = fetch_clip_for_scene(
                 assignment["scene"], assignment["query"], avg_scene_duration
             )
             if clip_path and clip_dur:
                 scene_paths.append((clip_path, clip_dur))
         
-        print(f"✅ CLIPS SCARICATE: {len(scene_paths)}/25", flush=True)
+        print(f"✅ CLIPS SCARICATE: {len(scene_paths)}/{num_scenes}", flush=True)
         if len(scene_paths) < 5:
-            raise RuntimeError(f"Troppe poche clip: {len(scene_paths)}/25")
+            raise RuntimeError(f"Troppe poche clip: {len(scene_paths)}/{num_scenes}")
         
-        # Normalize clips
         normalized_clips = []
         for i, (clip_path, _dur) in enumerate(scene_paths):
             try:
@@ -387,8 +410,8 @@ def process_video_async(job_id, data):
                 subprocess.run([
                     "ffmpeg", "-y", "-loglevel", "error", "-i", clip_path,
                     "-vf", "scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,fps=30",
-                    "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-an", normalized_path
-                ], timeout=120, check=True)
+                    "-c:v", "libx264", "-preset", "fast", "-crf", "23", "-an", normalized_path
+                ], timeout=MAX_DURATION, check=True)
                 if os.path.exists(normalized_path) and os.path.getsize(normalized_path) > 1000:
                     normalized_clips.append(normalized_path)
             except Exception:
@@ -397,7 +420,6 @@ def process_video_async(job_id, data):
         if not normalized_clips:
             raise RuntimeError("Nessuna clip normalizzata")
         
-        # Concat
         def get_duration(p):
             out = subprocess.run([
                 "ffprobe", "-v", "error", "-show_entries", "format=duration",
@@ -436,10 +458,9 @@ def process_video_async(job_id, data):
             "-f", "concat", "-safe", "0", "-i", concat_list_tmp.name,
             "-vf", "fps=30,format=yuv420p", "-c:v", "libx264", "-preset", "fast", "-crf", "23",
             "-t", str(real_duration), video_looped_path
-        ], timeout=600, check=True)
+        ], timeout=MAX_DURATION, check=True)
         os.unlink(concat_list_tmp.name)
         
-        # Final merge
         final_video_tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
         final_video_path = final_video_tmp.name
         final_video_tmp.close()
@@ -448,11 +469,10 @@ def process_video_async(job_id, data):
             "ffmpeg", "-y", "-loglevel", "error",
             "-i", video_looped_path, "-i", audiopath,
             "-filter_complex", "[0:v]scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,format=yuv420p[v]",
-            "-map", "[v]", "-map", "1:a", "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+            "-map", "[v]", "-map", "1:a", "-c:v", "libx264", "-preset", "fast", "-crf", "23",
             "-c:a", "aac", "-b:a", "192k", "-shortest", final_video_path
-        ], timeout=600, check=True)
+        ], timeout=MAX_DURATION, check=True)
         
-        # R2 upload
         s3_client = get_s3_client()
         today = dt.datetime.utcnow().strftime("%Y-%m-%d")
         object_key = f"videos/{today}/{uuid.uuid4().hex}.mp4"
@@ -465,24 +485,17 @@ def process_video_async(job_id, data):
         public_url = f"{R2_PUBLIC_BASE_URL.rstrip('/')}/{object_key}"
         cleanup_old_videos(s3_client, object_key)
         
-        # Sheets update BULLETPROOF v2 - INVESTFINANZA
+        # 🔧 Sheets update BULLETPROOF
         gc = get_gspread_client()
         print(f"🔍 DEBUG gspread client: {'OK' if gc else 'FAILED'}", flush=True)
         if gc and row_number > 0:
             try:
-                print(f"🔍 Opening sheet ID: {SPREADSHEET_ID[:20]}...", flush=True)
-                workbook = gc.open_by_key(SPREADSHEET_ID)
-                sheet = workbook.sheet1
-                print(f"🔍 Sheet title: {sheet.title}", flush=True)
-                
-                row_num = int(row_number)
-                sheet.update_cell(row_num, 13, public_url)  # Col M = VIDEO URL
-                sheet.update_cell(row_num, 2, "GENERATO")    # Col B = STATUS FINANZA
-                
-                print(f"📊 ✅ Sheet row {row_num}: M={public_url[:60]}... + B=GENERATO", flush=True)
-                
+                sheet = gc.open_by_key(SPREADSHEET_ID).sheet1
+                sheet.update_cell(row_number, 13, public_url)      # Col M: URL
+                sheet.update_cell(row_number, 2, "PRODOTTO")       # Col B: anti-loop!
+                print(f"📊 ✅ Sheet row {row_number}: M={public_url[:60]} + B=PRODOTTO (anti-loop)", flush=True)
             except Exception as e:
-                print(f"❌ Sheets errore row {row_number}: {type(e).__name__}: {str(e)}", flush=True)
+                print(f"❌ Sheets fallito row {row_number}: {str(e)}", flush=True)
         
         # Cleanup
         paths_to_cleanup = [audiopath, video_looped_path, final_video_path] + normalized_clips + [p[0] for p in scene_paths]
@@ -492,7 +505,7 @@ def process_video_async(job_id, data):
             except Exception:
                 pass
         
-        print(f"✅ 💰 VIDEO INVESTFINANZA COMPLETO: {real_duration/60:.1f}min → {public_url}", flush=True)
+        print(f"✅ 💰 VIDEO INVESTIMENTI FINANZA COMPLETO: {real_duration/60:.1f}min → {public_url}", flush=True)
         
         job.update({
             "status": "completed",
@@ -501,27 +514,25 @@ def process_video_async(job_id, data):
             "clips_used": len(scene_paths),
             "row_number": row_number
         })
+
+        # Notifica n8n flusso 2
+        notify_n8n_flusso2(job)
         
     except Exception as e:
-        print(f"❌ ERRORE INVESTFINANZA: {e}", flush=True)
+        print(f"❌ ERRORE INVESTIMENTI FINANZA: {e}", flush=True)
         job.update({"status": "failed", "error": str(e)})
     
     finally:
         Thread(target=lambda: cleanup_job_delayed(job_id), daemon=True).start()
 
 def cleanup_job_delayed(job_id, delay=3600):
-    """Cancella job dopo 1h"""
     import time
     time.sleep(delay)
     if job_id in jobs:
         del jobs[job_id]
 
-# =======================
-# GENERATE ENDPOINT
-# =======================
 @app.route("/generate", methods=["POST"])
 def generate():
-    """Endpoint principale: crea job async INVESTFINANZA"""
     try:
         data = request.get_json(force=True) or {}
         job_id = str(uuid.uuid4())
@@ -532,16 +543,14 @@ def generate():
             "data": data
         }
         
-        # Pulizia jobs vecchi
         if len(jobs) > MAX_JOBS:
             old_jobs = sorted(jobs.keys(), key=lambda k: jobs[k]["created_at"])[:len(jobs)-MAX_JOBS]
             for oj in old_jobs:
                 del jobs[oj]
         
-        # Avvia processing async
         Thread(target=process_video_async, args=(job_id, data), daemon=True).start()
         
-        print(f"🚀 INVESTFINANZA Job {job_id} QUEUED: raw_row={data.get('row_number')}", flush=True)
+        print(f"🚀 INVESTIMENTI FINANZA Job {job_id} QUEUED: raw_row={data.get('row_number')}", flush=True)
         return jsonify({
             "success": True,
             "job_id": job_id,
@@ -552,9 +561,6 @@ def generate():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
-# =======================
-# MAIN
-# =======================
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port, threaded=True)
